@@ -288,8 +288,7 @@ function Login({ navigate, role, setRole }) {
       <div className="grid min-h-screen lg:grid-cols-[58%_42%]">
         <section className="relative min-h-[560px] overflow-hidden bg-slate-950 px-6 py-7 text-white sm:min-h-[640px] sm:px-10 lg:min-h-screen">
           <img src={heroBg} alt="" className="absolute inset-0 h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.92)_0%,rgba(2,6,23,0.74)_45%,rgba(2,6,23,0.34)_100%)]" />
-          <div className="absolute inset-y-0 right-0 hidden w-32 bg-gradient-to-r from-transparent to-white lg:block" />
+          <div className="absolute inset-0 bg-slate-950/72" />
           <div className="relative z-10 flex min-h-[calc(100vh-3.5rem)] flex-col">
             <header className="flex items-center justify-between gap-6">
               <div className="flex items-center gap-3">
