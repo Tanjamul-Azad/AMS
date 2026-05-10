@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { alerts, patients, recommendations, reports, reviews, roles } from "./data";
+import heroBg from "./assets/ams-hero-bg.png";
 
 const statusStyles = {
   safe: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -281,69 +282,131 @@ function AppShell({ children, path, navigate, role, onLogout, notificationCount 
 function Login({ navigate, role, setRole }) {
   const [remember, setRemember] = useState(false);
   const [notice, setNotice] = useState("");
+  const [authMode, setAuthMode] = useState("Sign In");
   return (
-    <div className="clinical-shell min-h-screen">
-      <div className="mx-auto grid min-h-screen max-w-7xl gap-10 px-6 py-10 lg:grid-cols-[1fr_560px] lg:items-center">
-        <div>
-          <Logo />
-          <div className="mt-20 max-w-xl">
-            <h1 className="text-5xl font-bold tracking-normal text-blue-950">StewardCare <span className="text-teal-500">AMS</span></h1>
-            <p className="mt-4 text-2xl text-slate-500">Antimicrobial Stewardship</p>
-            <h2 className="mt-12 text-3xl font-bold leading-tight text-slate-950">Smarter stewardship.<br />Safer patients.</h2>
-            <p className="mt-6 max-w-md text-lg leading-8 text-slate-600">Review patients, act on evidence-based recommendations, manage escalations, and monitor outcomes in one secure clinical workspace.</p>
-            <div className="mt-10 grid gap-5">
-              {[
-                [Users, "Review Patients", "See patients under review and track antimicrobial therapy."],
-                [ShieldCheck, "Act on Recommendations", "View evidence-based guidance and take confident actions."],
-                [AlertTriangle, "Manage Escalations", "Respond to high-priority alerts that need attention."],
-                [LineChart, "Track & Report", "Monitor antimicrobial use and outcomes with reports."],
-              ].map(([Icon, title, text]) => (
-                <div key={title} className="flex items-start gap-4">
-                  <div className="grid h-12 w-12 place-items-center rounded-lg border border-blue-100 bg-white text-blue-600"><Icon className="h-6 w-6" /></div>
-                  <div>
-                    <p className="font-bold">{title}</p>
-                    <p className="text-sm leading-6 text-slate-600">{text}</p>
-                  </div>
+    <div className="min-h-screen bg-white text-slate-950">
+      <div className="grid min-h-screen lg:grid-cols-[58%_42%]">
+        <section className="relative min-h-[560px] overflow-hidden bg-slate-950 px-6 py-7 text-white sm:min-h-[640px] sm:px-10 lg:min-h-screen">
+          <img src={heroBg} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,0.92)_0%,rgba(2,6,23,0.74)_45%,rgba(2,6,23,0.34)_100%)]" />
+          <div className="absolute inset-y-0 right-0 hidden w-32 bg-gradient-to-r from-transparent to-white lg:block" />
+          <div className="relative z-10 flex min-h-[calc(100vh-3.5rem)] flex-col">
+            <header className="flex items-center justify-between gap-6">
+              <div className="flex items-center gap-3">
+                <div className="relative grid h-10 w-10 shrink-0 place-items-center border border-teal-300/40 bg-blue-600 text-white">
+                  <div className="absolute inset-x-3 inset-y-1 bg-white" />
+                  <div className="absolute inset-x-1 inset-y-3 bg-white" />
+                  <Plus className="relative z-10 h-5 w-5 text-blue-600" strokeWidth={3} />
+                </div>
+                <div className="leading-tight">
+                  <p className="font-bold text-white">StewardCare <span className="text-teal-300">AMS</span></p>
+                  <p className="text-sm font-semibold text-slate-400">Antimicrobial Stewardship</p>
+                </div>
+              </div>
+              <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-300 xl:flex">
+                {["About", "Features", "Workflow", "Resources"].map((item) => (
+                  <button key={item} onClick={() => setNotice(`${item} section is available after sign in for this demo.`)} className="hover:text-white">{item}</button>
+                ))}
+              </nav>
+            </header>
+
+            <div className="flex flex-1 items-center py-10 lg:py-14">
+              <div className="max-w-3xl">
+                <h1 className="max-w-2xl text-4xl font-bold leading-[1.04] tracking-normal sm:text-6xl xl:text-7xl">
+                  Smarter Stewardship.<br />
+                  <span className="text-teal-300">Safer Patients.</span>
+                </h1>
+                <div className="mt-8 h-1 w-20 rounded-full bg-teal-300" />
+                <p className="mt-8 max-w-xl text-lg leading-8 text-slate-300">
+                  Clinical decision support for antimicrobial therapy reviews, escalations, and outcome tracking in one secure workspace.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-5 text-sm font-semibold text-slate-100 lg:mt-10 lg:gap-6">
+                  {[
+                    [Users, "Evidence-guided recommendations"],
+                    [ShieldCheck, "Optimize therapy confidence"],
+                    [LineChart, "Track outcomes and impact"],
+                  ].map(([Icon, text]) => (
+                    <div key={text} className="flex max-w-48 items-center gap-3 border-r border-white/20 pr-6 last:border-r-0">
+                      <Icon className="h-7 w-7 shrink-0 text-teal-300" />
+                      <span>{text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-5 border-t border-white/15 pt-7 text-sm text-slate-300 sm:grid-cols-4">
+              {[["48", "Patients under review"], ["<2m", "Review triage"], ["28", "Recommendations today"], ["92%", "Guideline concordance"]].map(([value, label]) => (
+                <div key={label}>
+                  <p className="text-2xl font-bold text-teal-200">{value}</p>
+                  <p className="mt-1">{label}</p>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </section>
 
-        <Card className="soft-shadow p-8">
-          <button onClick={() => setNotice("Help request opened. A support specialist will contact you for this demo session.")} className="mb-8 ml-auto flex text-sm text-slate-500 hover:text-blue-700"><HelpCircle className="mr-2 h-5 w-5" /> Need help signing in?</button>
-          <h2 className="text-3xl font-bold">Welcome back</h2>
-          <p className="mt-3 text-lg text-slate-500">Sign in to <span className="text-blue-700">StewardCare AMS</span></p>
-          {notice && <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">{notice}</div>}
-          <div className="mt-8 space-y-5">
-            <div>
-              <label className="text-sm font-semibold">Hospital email or username</label>
-              <Field icon={User} placeholder="you@cityviewmc.org" className="mt-2" />
+        <section className="flex min-h-screen items-center justify-center px-6 py-8 sm:px-10">
+          <div className="w-full max-w-md">
+            <div className="mb-7 text-center">
+              <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
+                <ShieldCheck className="h-8 w-8" />
+              </div>
+              <h2 className="text-3xl font-bold leading-tight">Sign in to your clinical workspace</h2>
+              <p className="mt-3 text-slate-500">Access StewardCare AMS and continue patient reviews.</p>
             </div>
-            <div>
-              <label className="text-sm font-semibold">Password</label>
-              <Field icon={Lock} placeholder="Enter your password" className="mt-2" />
+
+            <div className="mb-6 grid rounded-lg border border-slate-200 bg-slate-100 p-1">
+              <div className="grid grid-cols-2 gap-1">
+                {["Sign In", "Register"].map((item) => (
+                  <button key={item} onClick={() => setAuthMode(item)} className={cx("rounded-md px-4 py-2.5 text-sm font-bold transition", authMode === item ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-800")}>{item}</button>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 text-slate-600"><input type="checkbox" checked={remember} onChange={() => setRemember(!remember)} /> Remember me</label>
-              <button onClick={() => setNotice("Password reset instructions queued for the entered account.")} className="font-semibold text-blue-700">Forgot password?</button>
+
+            {notice && <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">{notice}</div>}
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Hospital email</label>
+                <Field icon={Mail} placeholder="you@cityviewmc.org" className="mt-2 h-12 bg-slate-50" />
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Password</label>
+                  <button onClick={() => setNotice("Password reset instructions queued for the entered account.")} className="text-xs font-bold text-blue-700">Forgot password?</button>
+                </div>
+                <Field icon={Lock} placeholder="Enter your password" className="mt-2 h-12 bg-slate-50" />
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={remember} onChange={() => setRemember(!remember)} /> Remember this device</label>
+
+              <Button className="min-h-12 w-full text-base shadow-lg shadow-blue-600/20" onClick={() => navigate("/dashboard")}>
+                {authMode === "Register" ? "Create Account" : "Sign In to Dashboard"}
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+
+              <div className="flex items-center gap-4 text-sm text-slate-400"><span className="h-px flex-1 bg-slate-200" />or<span className="h-px flex-1 bg-slate-200" /></div>
+              <Button variant="outline" className="w-full" onClick={() => navigate("/dashboard")}><Lock className="h-4 w-4" /> Sign in with SSO</Button>
             </div>
-            <Button className="w-full" onClick={() => navigate("/dashboard")}>Sign in</Button>
-            <div className="flex items-center gap-4 text-slate-400"><span className="h-px flex-1 bg-slate-200" />or<span className="h-px flex-1 bg-slate-200" /></div>
-            <Button variant="outline" className="w-full" onClick={() => navigate("/dashboard")}><Lock className="h-4 w-4" /> Sign in with SSO</Button>
+
+            <div className="mt-5">
+              <p className="mb-2 text-sm font-bold">Select your role</p>
+              <div className="grid grid-cols-2 gap-2">
+                {roles.map((item) => (
+                  <button key={item} onClick={() => setRole(item)} className={cx("focus-ring rounded-md border px-3 py-2.5 text-left text-xs font-bold transition", role === item ? "border-blue-600 bg-blue-50 text-blue-800" : "border-slate-200 text-slate-600 hover:border-blue-200")}>
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-center gap-6 border-t border-slate-200 pt-5 text-xs font-bold text-slate-400">
+              <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" />Secure Gateway</span>
+              <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-teal-600" />Verified Access</span>
+            </div>
           </div>
-          <div className="mt-8">
-            <p className="mb-3 text-sm font-bold">Select your role</p>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {roles.map((item) => (
-                <button key={item} onClick={() => setRole(item)} className={cx("focus-ring rounded-lg border p-4 text-center text-sm font-bold transition", role === item ? "border-blue-600 bg-blue-50 text-blue-800" : "border-slate-200 hover:border-blue-200")}>
-                  <Stethoscope className={cx("mx-auto mb-2 h-8 w-8", role === item ? "text-blue-600" : "text-slate-400")} />
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
-        </Card>
+        </section>
       </div>
     </div>
   );
