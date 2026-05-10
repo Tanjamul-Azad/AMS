@@ -33,7 +33,6 @@ import {
   X,
 } from "lucide-react";
 import { alerts, patients, recommendations, reports, reviews, roles } from "./data";
-import heroBg from "./assets/ams-hero-bg.png";
 
 const statusStyles = {
   safe: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -287,7 +286,15 @@ function Login({ navigate, role, setRole }) {
     <div className="min-h-screen bg-white text-slate-950">
       <div className="grid min-h-screen lg:grid-cols-[58%_42%]">
         <section className="relative min-h-[560px] overflow-hidden bg-slate-950 px-6 py-7 text-white sm:min-h-[640px] sm:px-10 lg:min-h-screen">
-          <img src={heroBg} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            src="/landing%20vid.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            aria-hidden="true"
+          />
           <div className="absolute inset-0 bg-slate-950/72" />
           <div className="relative z-10 flex min-h-[calc(100vh-3.5rem)] flex-col">
             <header className="flex items-center justify-between gap-6">
