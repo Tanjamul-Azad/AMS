@@ -73,8 +73,8 @@ function cx(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
-function getPatient(id) {
-  return patients.find((patient) => patient.id === id) || patients[0];
+function getPatient(id, list = patients) {
+  return list.find((patient) => patient.id === id) || patients.find((patient) => patient.id === id) || list[0] || patients[0];
 }
 
 function getRecommendation(idOrPatientId) {
@@ -121,6 +121,7 @@ function Button({ children, variant = "primary", className = "", ...props }) {
     ghost: "bg-transparent text-slate-600 hover:bg-slate-100 border-transparent",
     soft: "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200",
     danger: "bg-red-50 text-red-700 hover:bg-red-100 border-red-200",
+    critical: "bg-[#D32F2F] text-white hover:bg-[#B71C1C] border-[#D32F2F] shadow-sm shadow-red-200",
     success: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200",
   };
   return (
@@ -573,14 +574,14 @@ function ReviewActivity() {
   );
 }
 
-function PatientsPage({ navigate }) {
+function PatientsPage({ navigate, patientsList = patients }) {
   const [query, setQuery] = useState("");
   const [ward, setWard] = useState("All wards");
   const [status, setStatus] = useState("All statuses");
   const [notice, setNotice] = useState("");
   const [viewMode, setViewMode] = useState("List");
   const [page, setPage] = useState(1);
-  const filtered = patients.filter((patient) => {
+  const filtered = patientsList.filter((patient) => {
     const matchesQuery = `${patient.name} ${patient.id} ${patient.diagnosis}`.toLowerCase().includes(query.toLowerCase());
     const matchesWard = ward === "All wards" || patient.ward === ward;
     const matchesStatus = status === "All statuses" || patient.status === status;
@@ -588,9 +589,13 @@ function PatientsPage({ navigate }) {
   });
   return (
     <>
-      <PageTitle title="Patients" subtitle="Search and review patients receiving antimicrobial therapy" />
+      <PageTitle
+        title="Patients"
+        subtitle="Search and review patients receiving antimicrobial therapy"
+        actions={<Button onClick={() => navigate("/patients/new")}><Plus className="h-4 w-4" />Add New Patient</Button>}
+      />
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Users} label="Total patients" value="124" delta="↑ 8 from yesterday" />
+        <StatCard icon={Users} label="Total patients" value={`${patientsList.length}`} delta="Current workspace" />
         <StatCard icon={Users} label="New today" value="15" delta="↑ 3 from yesterday" tone="switch" />
         <StatCard icon={AlertTriangle} label="Needs review" value="23" delta="↑ 4 from yesterday" tone="review" />
         <StatCard icon={ShieldCheck} label="Escalated" value="8" delta="↑ 2 from yesterday" tone="escalated" />
@@ -607,43 +612,273 @@ function PatientsPage({ navigate }) {
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-bold">Patient {viewMode} <Badge>{filtered.length} visible</Badge></h3><div className="flex gap-2"><Button variant="ghost" onClick={() => setNotice(`${filtered.length} visible patients exported for this demo session.`)}><Download className="h-4 w-4" />Export</Button><Button variant={viewMode === "List" ? "soft" : "ghost"} className="px-3" onClick={() => { setViewMode("List"); setNotice("List view selected."); }}><Menu className="h-4 w-4" /></Button><Button variant={viewMode === "Grid" ? "soft" : "ghost"} className="px-3" onClick={() => { setViewMode("Grid"); setNotice("Grid view selected."); }}><Grid2X2 className="h-4 w-4" /></Button></div></div>
             <PatientTable patients={filtered} navigate={navigate} />
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-500"><span>Showing 1-{filtered.length} of 124 patients</span><div className="flex gap-2">{[1, 2, 3].map((item) => <Button key={item} variant={page === item ? "outline" : "ghost"} className="h-9 px-3" onClick={() => { setPage(item); setNotice(`Page ${item} selected.`); }}>{item}</Button>)}</div></div>
+            <div className="mt-4 flex items-center justify-between text-sm text-slate-500"><span>Showing 1-{filtered.length} of {patientsList.length} patients</span><div className="flex gap-2">{[1, 2, 3].map((item) => <Button key={item} variant={page === item ? "outline" : "ghost"} className="h-9 px-3" onClick={() => { setPage(item); setNotice(`Page ${item} selected.`); }}>{item}</Button>)}</div></div>
           </Card>
         </div>
-        <RightRail navigate={navigate} />
+        <RightRail navigate={navigate} patientsList={patientsList} />
       </div>
     </>
   );
 }
 
-function RightRail({ navigate }) {
+function RightRail({ navigate, patientsList = patients }) {
   return (
     <div className="space-y-5">
       <Card className="p-5">
         <h3 className="mb-4 text-lg font-bold">High-priority patients</h3>
         <div className="space-y-3">
-          {patients.filter((p) => p.confidence < 56).map((patient) => <button key={patient.id} onClick={() => navigate(`/patients/${patient.id}`)} className="w-full rounded-lg border border-amber-200 p-3 text-left hover:bg-amber-50"><p className="font-bold">{patient.id} · {patient.ward}</p><p className="text-sm">{patient.name}, {patient.ageSex}</p><p className="text-sm text-slate-500">{patient.diagnosis}</p></button>)}
+          {patientsList.filter((p) => p.confidence < 56).map((patient) => <button key={patient.id} onClick={() => navigate(`/patients/${patient.id}`)} className="w-full rounded-lg border border-amber-200 p-3 text-left hover:bg-amber-50"><p className="font-bold">{patient.id} · {patient.ward}</p><p className="text-sm">{patient.name}, {patient.ageSex}</p><p className="text-sm text-slate-500">{patient.diagnosis}</p></button>)}
         </div>
       </Card>
       <Card className="p-5">
         <h3 className="mb-4 text-lg font-bold">Recently viewed</h3>
-        {patients.slice(0, 5).map((patient) => <button key={patient.id} onClick={() => navigate(`/patients/${patient.id}`)} className="flex w-full items-center justify-between border-b border-slate-100 py-3 text-left last:border-0"><span><b>{patient.id}</b><br /><span className="text-sm text-slate-500">{patient.name}</span></span><Confidence value={patient.confidence} /></button>)}
+        {patientsList.slice(0, 5).map((patient) => <button key={patient.id} onClick={() => navigate(`/patients/${patient.id}`)} className="flex w-full items-center justify-between border-b border-slate-100 py-3 text-left last:border-0"><span><b>{patient.id}</b><br /><span className="text-sm text-slate-500">{patient.name}</span></span><Confidence value={patient.confidence} /></button>)}
       </Card>
     </div>
   );
 }
 
-function PatientOverview({ id, navigate }) {
-  const patient = getPatient(id);
+function NewPatientIntakePage({ navigate, onCreatePatient }) {
+  const [pathway, setPathway] = useState("New Patient / No Records");
   const [notice, setNotice] = useState("");
+  const [form, setForm] = useState({
+    name: "Unknown patient",
+    tempId: `TMP-${Date.now().toString().slice(-5)}`,
+    ageSex: "Adult / Unknown",
+    chiefComplaint: "Fever with suspected infection",
+    ward: "ER",
+    temp: "38.4 C",
+    bp: "90/58",
+    hr: "118",
+    rr: "26",
+    spo2: "93%",
+    allergies: "Unknown",
+    currentMeds: "Unknown",
+    recentAntibiotics: "Unknown",
+    cultureOrdered: "No",
+  });
+  const [mrn, setMrn] = useState("");
+  const [summary, setSummary] = useState("Transfer summary: ceftriaxone started yesterday, blood culture pending, no allergy list attached.");
+  const [verified, setVerified] = useState({});
+  const extractedFields = [
+    ["Prior antibiotics", "Ceftriaxone started at transferring facility"],
+    ["Culture status", "Blood culture pending"],
+    ["Allergy history", "Not documented"],
+    ["Resistance pattern", "No prior organism record found"],
+  ];
+  const unknowns = [
+    ["Allergies", form.allergies === "Unknown" || pathway === "Transferred Patient"],
+    ["Prior antibiotics", form.recentAntibiotics === "Unknown"],
+    ["Resistance history", pathway !== "Existing EHR Patient"],
+    ["Culture ordered", form.cultureOrdered !== "Yes"],
+  ];
+  const uncertaintyCount = unknowns.filter(([, missing]) => missing).length;
+  const confidence = pathway === "Existing EHR Patient" ? 86 : pathway === "Transferred Patient" ? 42 : 35;
+  const updateForm = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const submitPatient = () => {
+    const id = pathway === "Existing EHR Patient" && mrn.trim() ? `P-${mrn.trim()}` : form.tempId;
+    const patient = {
+      id,
+      mrn: mrn.trim() || form.tempId,
+      name: form.name || "Unknown patient",
+      ageSex: form.ageSex,
+      ward: form.ward,
+      bed: pathway === "Existing EHR Patient" ? "EHR import" : "Intake",
+      diagnosis: form.chiefComplaint,
+      infectionType: "Suspected infection",
+      therapy: pathway === "Existing EHR Patient" ? "Continue active EHR therapy" : "Conservative empiric therapy pending review",
+      status: pathway === "Existing EHR Patient" ? "Safe to continue" : "Escalated",
+      confidence,
+      allergies: form.allergies === "No" ? "No known drug allergies" : form.allergies === "Yes" ? "Allergy reported - verify details" : "Unknown allergy history",
+      admitted: "Intake today",
+      daysAdmitted: 0,
+      attending: "Dr. Sarah Johnson",
+      temp: form.temp,
+      hr: form.hr,
+      bp: form.bp,
+      rr: form.rr,
+      spo2: form.spo2,
+      reviewStatus: pathway === "Existing EHR Patient" ? "safe" : "escalated",
+      lastUpdated: "Just now",
+      source: pathway,
+      uncertaintyCount,
+      currentProblems: [form.chiefComplaint, "Incomplete antimicrobial history", "Epistemic uncertainty escalation"],
+      cultures: [["Initial culture order", form.cultureOrdered === "Yes" ? "Ordered" : "Not confirmed", "-", "Intake", form.cultureOrdered === "Yes" ? "Pending" : "Missing"]],
+      medications: [[pathway === "Transferred Patient" ? "Prior facility therapy" : "Empiric therapy", "-", "-", "Pending verification", "Intake"]],
+      labs: [["Vitals screen", "High priority", "Manual intake", "Now"]],
+      timeline: [
+        ["Now", pathway, "Patient entered through manual intake workflow."],
+        ["Now", "Uncertainty scorer", `${uncertaintyCount} critical history fields require confirmation.`],
+        ["Now", "Escalation path", pathway === "Existing EHR Patient" ? "EHR timeline imported." : "Human review required before high-confidence recommendation."],
+      ],
+    };
+    onCreatePatient(patient);
+    navigate(`/patients/${patient.id}`);
+  };
+
+  return (
+    <>
+      <PageTitle
+        title="New Patient Intake"
+        subtitle="Manual entry path for new, transferred, or EHR-linked patients."
+        actions={<Button variant="outline" onClick={() => navigate("/patients")}>Back to Patients</Button>}
+      />
+      {notice && <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">{notice}</div>}
+      <Card className="mb-5 border-amber-200 bg-amber-50 p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-lg font-bold text-amber-950">Epistemic Uncertainty</p>
+            <p className="mt-1 text-sm leading-6 text-amber-900">Missing history is treated as a safety signal. The system lowers confidence and routes uncertain cases to human review.</p>
+          </div>
+          <Badge tone={uncertaintyCount > 1 ? "review" : "safe"}>{uncertaintyCount > 1 ? "Escalate for human review" : "High confidence EHR path"}</Badge>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          {unknowns.map(([label, missing]) => (
+            <div key={label} className={cx("rounded-md border bg-white p-3 text-sm", missing ? "border-amber-200" : "border-emerald-200")}>
+              <p className="font-bold">{label}</p>
+              <p className={cx("mt-1 font-semibold", missing ? "text-amber-700" : "text-emerald-700")}>{missing ? "Missing / unknown" : "Recorded"}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <div className="grid gap-5 xl:grid-cols-[320px_1fr]">
+        <Card className="p-5">
+          <SectionHeader title="Intake Pathway" />
+          <div className="space-y-3">
+            {["Existing EHR Patient", "New Patient / No Records", "Transferred Patient"].map((item) => (
+              <button key={item} onClick={() => setPathway(item)} className={cx("w-full rounded-lg border p-4 text-left transition", pathway === item ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50")}>
+                <p className="font-bold">{item}</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {item === "Existing EHR Patient" ? "Import history from available EHR timeline." : item === "Transferred Patient" ? "Parse transfer summary and verify extracted fields." : "Use rapid critical-fields-only intake."}
+                </p>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <div className="space-y-5">
+          {pathway === "Existing EHR Patient" && (
+            <ClinicalPanel title="Existing EHR Patient">
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <Field icon={Search} placeholder="Search by MRN or national ID..." value={mrn} onChange={setMrn} />
+                <Button onClick={() => setNotice(mrn ? `EHR timeline found for ${mrn}.` : "Enter an MRN to simulate EHR lookup.")}>Import EHR History</Button>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {["Full timeline available", "Allergy history synced", "Prior resistance checked"].map((item) => <div key={item} className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{item}</div>)}
+              </div>
+            </ClinicalPanel>
+          )}
+
+          {pathway === "Transferred Patient" && (
+            <ClinicalPanel title="Transfer Patient Record Import">
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+                <FileText className="mx-auto h-8 w-8 text-slate-500" />
+                <p className="mt-2 font-bold">Upload discharge summary PDF</p>
+                <p className="mt-1 text-sm text-slate-500">Prototype mode: paste summary text below to simulate NLP extraction.</p>
+              </div>
+              <textarea value={summary} onChange={(event) => setSummary(event.target.value)} className="mt-4 h-24 w-full rounded-md border border-slate-200 p-3 text-sm outline-none focus:border-blue-300" />
+              <div className="mt-4 grid gap-3">
+                {extractedFields.map(([label, value]) => {
+                  const isVerified = verified[label];
+                  return (
+                    <div key={label} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{label}</p><Badge tone="neutral">AI extracted</Badge><Badge tone={isVerified ? "safe" : "review"}>{isVerified ? "Verified" : "Unverified"}</Badge></div>
+                        <p className="mt-1 text-sm text-slate-600">{value}</p>
+                      </div>
+                      <div className="flex gap-2"><Button variant="outline" onClick={() => setNotice(`${label} opened for edit.`)}>Edit</Button><Button variant={isVerified ? "success" : "soft"} onClick={() => setVerified((current) => ({ ...current, [label]: true }))}>Confirm</Button></div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ClinicalPanel>
+          )}
+
+          <ClinicalPanel title="Rapid Critical Fields">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field placeholder="Patient name or temporary label" value={form.name} onChange={(value) => updateForm("name", value)} />
+              <Field placeholder="Temporary patient ID" value={form.tempId} onChange={(value) => updateForm("tempId", value)} />
+              <Field placeholder="Age / sex" value={form.ageSex} onChange={(value) => updateForm("ageSex", value)} />
+              <SelectBox value={form.ward} onChange={(value) => updateForm("ward", value)} options={["ER", "ICU", "Med Ward", "Surg Ward"]} />
+              <Field placeholder="Chief complaint" value={form.chiefComplaint} onChange={(value) => updateForm("chiefComplaint", value)} className="md:col-span-2" />
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-5">
+              {[["temp", "Temperature"], ["bp", "BP"], ["hr", "HR"], ["rr", "RR"], ["spo2", "SpO2"]].map(([key, label]) => <Field key={key} placeholder={label} value={form[key]} onChange={(value) => updateForm(key, value)} />)}
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <SelectBox value={form.allergies} onChange={(value) => updateForm("allergies", value)} options={["Unknown", "No", "Yes"]} />
+              <SelectBox value={form.currentMeds} onChange={(value) => updateForm("currentMeds", value)} options={["Unknown", "No", "Yes"]} />
+              <SelectBox value={form.recentAntibiotics} onChange={(value) => updateForm("recentAntibiotics", value)} options={["Unknown", "No", "Yes"]} />
+              <SelectBox value={form.cultureOrdered} onChange={(value) => updateForm("cultureOrdered", value)} options={["No", "Yes"]} />
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <Button variant="outline" onClick={() => setNotice("Draft intake saved for this demo session.")}>Save draft</Button>
+              <Button onClick={submitPatient}>Create patient and escalate</Button>
+            </div>
+          </ClinicalPanel>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function PatientOverview({ id, navigate, patientsList = patients }) {
+  const patient = getPatient(id, patientsList);
+  const [notice, setNotice] = useState("");
+  const [emergencyActive, setEmergencyActive] = useState(false);
+  const activateCodeSepsis = () => {
+    setEmergencyActive(true);
+    setNotice("Code Sepsis activated: emergency override is routing this case to the 1-hour sepsis protocol and notifying the ASP team.");
+  };
   return (
     <>
       <PageTitle
         title="Patient Overview"
         subtitle={`Dashboard > Patients > ${patient.id}`}
-        actions={<><Button variant="success" onClick={() => navigate(`/patients/${patient.id}/recommendation`)}><ShieldCheck className="h-4 w-4" />View recommendation</Button><Button variant="outline" onClick={() => setNotice(`Note composer opened for ${patient.id}.`)}><Plus className="h-4 w-4" />Add note</Button><Button onClick={() => navigate(`/patients/${patient.id}/review`)}>Request review</Button></>}
+        actions={<><Button variant="success" onClick={() => navigate(`/patients/${patient.id}/recommendation`)}><ShieldCheck className="h-4 w-4" />View recommendation</Button><Button variant="outline" onClick={() => setNotice(`Note composer opened for ${patient.id}.`)}><Plus className="h-4 w-4" />Add note</Button><Button onClick={() => navigate(`/patients/${patient.id}/review`)}>Request review</Button><Button variant="critical" onClick={activateCodeSepsis}><AlertTriangle className="h-4 w-4" />Code Sepsis</Button></>}
       />
       {notice && <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">{notice}</div>}
+      {emergencyActive && (
+        <Card className="mb-5 border-red-300 bg-red-50 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-[#D32F2F] text-white">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-red-950">Emergency Override Active</p>
+                <p className="mt-1 text-sm leading-6 text-red-900">Routine stewardship checks are paused for this case. The system is prioritizing critical vitals, the IDSA 1-hour sepsis bundle, fatal contraindication screening, and a specialist red alert.</p>
+              </div>
+            </div>
+            <Badge tone="critical">Critical Red Alert sent</Badge>
+          </div>
+          <div className="mt-4 grid gap-3 text-sm md:grid-cols-4">
+            {[
+              ["Extractor", "Fetches current BP, HR, RR, SpO2, and shock indicators."],
+              ["Navigator", "Routes directly to the 1-hour sepsis protocol."],
+              ["LTL Gate", "Bypasses routine culture-wait rules; blocks only fatal contraindications."],
+              ["HITL Alert", "Notifies ASP and specialist teams for immediate monitoring."],
+            ].map(([label, text]) => (
+              <div key={label} className="rounded-md border border-red-200 bg-white p-3">
+                <p className="font-bold text-red-900">{label}</p>
+                <p className="mt-1 leading-5 text-slate-700">{text}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+      {patient.source && (
+        <Card className="mb-5 border-amber-200 bg-amber-50 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2"><p className="text-lg font-bold text-amber-950">{patient.source}</p><Badge tone="review">High uncertainty</Badge><Badge tone="escalated">Human review required</Badge></div>
+              <p className="mt-2 text-sm leading-6 text-amber-900">This profile was created through manual intake. Missing allergies, prior antibiotic exposure, or resistance history reduce confidence and force the escalation pathway.</p>
+            </div>
+            <Confidence value={patient.confidence} />
+          </div>
+        </Card>
+      )}
       <Card className="mb-5 p-5">
         <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
           <div className="flex items-center gap-5"><div className="grid h-20 w-20 place-items-center rounded-full bg-blue-100 text-blue-700"><User className="h-11 w-11" /></div><div><h3 className="text-2xl font-bold">{patient.name}</h3><p className="text-slate-500">Patient ID</p><button onClick={() => setNotice(`${patient.id} is already open.`)} className="font-bold text-blue-700">{patient.id}</button></div></div>
@@ -675,7 +910,7 @@ function PatientOverview({ id, navigate }) {
         </div>
         <div className="space-y-5">
           <ClinicalPanel title="Safety Alerts">
-            {["Allergy: avoid penicillins if possible.", "Renal function: consider dose adjustment.", "Duplicate therapy: review concurrent therapy."].map((item) => <div key={item} className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"><AlertTriangle className="mb-1 h-5 w-5 text-amber-600" />{item}</div>)}
+            {(patient.source ? ["Manual intake: allergy and medication history require confirmation.", "Prior antimicrobial exposure is incomplete.", "Resistance history unknown: escalate to specialist review."] : ["Allergy: avoid penicillins if possible.", "Renal function: consider dose adjustment.", "Duplicate therapy: review concurrent therapy."]).map((item) => <div key={item} className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"><AlertTriangle className="mb-1 h-5 w-5 text-amber-600" />{item}</div>)}
           </ClinicalPanel>
           <ClinicalPanel title="Care Considerations">
             <List items={["De-escalate when culture results allow", "Consider narrowing to targeted therapy", "Planned 7-day course if clinical improvement continues"]} />
@@ -970,11 +1205,17 @@ function NotFound({ navigate }) {
 export default function App() {
   const { path, navigate } = useRoute();
   const [role, setRole] = useState(roles[1]);
+  const [createdPatients, setCreatedPatients] = useState([]);
+  const allPatients = useMemo(() => [...createdPatients, ...patients], [createdPatients]);
+  const addPatient = (patient) => {
+    setCreatedPatients((current) => [patient, ...current.filter((item) => item.id !== patient.id)]);
+  };
   const handleLogout = () => navigate("/login");
   const content = useMemo(() => {
     if (path === "/login") return <Login navigate={navigate} role={role} setRole={setRole} />;
     if (path === "/dashboard") return <Dashboard navigate={navigate} />;
-    if (path === "/patients") return <PatientsPage navigate={navigate} />;
+    if (path === "/patients") return <PatientsPage navigate={navigate} patientsList={allPatients} />;
+    if (path === "/patients/new") return <NewPatientIntakePage navigate={navigate} onCreatePatient={addPatient} />;
     if (path === "/alerts") return <AlertsPage navigate={navigate} />;
     if (path === "/recommendations") return <RecommendationsPage navigate={navigate} />;
     if (path === "/reviews") return <ReviewsPage navigate={navigate} />;
@@ -984,11 +1225,11 @@ export default function App() {
     const parts = path.split("/").filter(Boolean);
     if (parts[0] === "patients" && parts[1] && parts[2] === "recommendation") return <RecommendationDetail id={parts[1]} navigate={navigate} />;
     if (parts[0] === "patients" && parts[1] && parts[2] === "review") return <ReviewDetail id={parts[1]} navigate={navigate} />;
-    if (parts[0] === "patients" && parts[1]) return <PatientOverview id={parts[1]} navigate={navigate} />;
+    if (parts[0] === "patients" && parts[1]) return <PatientOverview id={parts[1]} navigate={navigate} patientsList={allPatients} />;
     if (parts[0] === "recommendations" && parts[1]) return <RecommendationDetail id={parts[1]} navigate={navigate} />;
     if (parts[0] === "reviews" && parts[1]) return <ReviewDetail id={parts[1]} navigate={navigate} />;
     return <NotFound navigate={navigate} />;
-  }, [path, role]);
+  }, [path, role, allPatients]);
 
   if (path === "/login") return content;
   return <AppShell path={path} navigate={navigate} role={role} onLogout={handleLogout}>{content}</AppShell>;
