@@ -167,6 +167,16 @@ function SelectBox({ value, onChange, options, className = "" }) {
   );
 }
 
+function FormControl({ label, hint, children, className = "" }) {
+  return (
+    <div className={className}>
+      <p className="mb-2 text-xs font-bold uppercase tracking-normal text-slate-500">{label}</p>
+      {children}
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+    </div>
+  );
+}
+
 function Confidence({ value }) {
   const tone = value >= 80 ? "text-emerald-600" : value >= 60 ? "text-blue-600" : value >= 45 ? "text-amber-600" : "text-violet-600";
   return (
@@ -760,8 +770,10 @@ function NewPatientIntakePage({ navigate, onCreatePatient }) {
         <div className="space-y-5">
           {pathway === "Existing EHR Patient" && (
             <ClinicalPanel title="Existing EHR Patient">
-              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                <Field icon={Search} placeholder="Search by MRN or national ID..." value={mrn} onChange={setMrn} />
+              <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                <FormControl label="MRN or national ID" hint="Use this when the patient has a previous record in this hospital network.">
+                  <Field icon={Search} placeholder="Search by MRN or national ID..." value={mrn} onChange={setMrn} />
+                </FormControl>
                 <Button onClick={() => setNotice(mrn ? `EHR timeline found for ${mrn}.` : "Enter an MRN to simulate EHR lookup.")}>Import EHR History</Button>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -777,7 +789,9 @@ function NewPatientIntakePage({ navigate, onCreatePatient }) {
                 <p className="mt-2 font-bold">Upload discharge summary PDF</p>
                 <p className="mt-1 text-sm text-slate-500">Prototype mode: paste summary text below to simulate NLP extraction.</p>
               </div>
-              <textarea value={summary} onChange={(event) => setSummary(event.target.value)} className="mt-4 h-24 w-full rounded-md border border-slate-200 p-3 text-sm outline-none focus:border-blue-300" />
+              <FormControl label="Transfer summary text" hint="Paste discharge notes, antibiotic history, culture results, or paper-transfer text." className="mt-4">
+                <textarea value={summary} onChange={(event) => setSummary(event.target.value)} className="h-24 w-full rounded-md border border-slate-200 p-3 text-sm outline-none focus:border-blue-300" />
+              </FormControl>
               <div className="mt-4 grid gap-3">
                 {extractedFields.map(([label, value]) => {
                   const isVerified = verified[label];
@@ -797,20 +811,42 @@ function NewPatientIntakePage({ navigate, onCreatePatient }) {
 
           <ClinicalPanel title="Rapid Critical Fields">
             <div className="grid gap-4 md:grid-cols-2">
-              <Field placeholder="Patient name or temporary label" value={form.name} onChange={(value) => updateForm("name", value)} />
-              <Field placeholder="Temporary patient ID" value={form.tempId} onChange={(value) => updateForm("tempId", value)} />
-              <Field placeholder="Age / sex" value={form.ageSex} onChange={(value) => updateForm("ageSex", value)} />
-              <SelectBox value={form.ward} onChange={(value) => updateForm("ward", value)} options={["ER", "ICU", "Med Ward", "Surg Ward"]} />
-              <Field placeholder="Chief complaint" value={form.chiefComplaint} onChange={(value) => updateForm("chiefComplaint", value)} className="md:col-span-2" />
+              <FormControl label="Patient name">
+                <Field placeholder="Patient name or temporary label" value={form.name} onChange={(value) => updateForm("name", value)} />
+              </FormControl>
+              <FormControl label="Temporary patient ID">
+                <Field placeholder="Temporary patient ID" value={form.tempId} onChange={(value) => updateForm("tempId", value)} />
+              </FormControl>
+              <FormControl label="Age / sex">
+                <Field placeholder="Age / sex" value={form.ageSex} onChange={(value) => updateForm("ageSex", value)} />
+              </FormControl>
+              <FormControl label="Current location / ward">
+                <SelectBox value={form.ward} onChange={(value) => updateForm("ward", value)} options={["ER", "ICU", "Med Ward", "Surg Ward"]} />
+              </FormControl>
+              <FormControl label="Chief complaint" className="md:col-span-2">
+                <Field placeholder="Chief complaint" value={form.chiefComplaint} onChange={(value) => updateForm("chiefComplaint", value)} />
+              </FormControl>
             </div>
             <div className="mt-5 grid gap-3 md:grid-cols-5">
-              {[["temp", "Temperature"], ["bp", "BP"], ["hr", "HR"], ["rr", "RR"], ["spo2", "SpO2"]].map(([key, label]) => <Field key={key} placeholder={label} value={form[key]} onChange={(value) => updateForm(key, value)} />)}
+              {[["temp", "Temperature"], ["bp", "Blood pressure"], ["hr", "Heart rate"], ["rr", "Respiratory rate"], ["spo2", "SpO2"]].map(([key, label]) => (
+                <FormControl key={key} label={label}>
+                  <Field placeholder={label} value={form[key]} onChange={(value) => updateForm(key, value)} />
+                </FormControl>
+              ))}
             </div>
             <div className="mt-5 grid gap-3 md:grid-cols-4">
-              <SelectBox value={form.allergies} onChange={(value) => updateForm("allergies", value)} options={["Unknown", "No", "Yes"]} />
-              <SelectBox value={form.currentMeds} onChange={(value) => updateForm("currentMeds", value)} options={["Unknown", "No", "Yes"]} />
-              <SelectBox value={form.recentAntibiotics} onChange={(value) => updateForm("recentAntibiotics", value)} options={["Unknown", "No", "Yes"]} />
-              <SelectBox value={form.cultureOrdered} onChange={(value) => updateForm("cultureOrdered", value)} options={["No", "Yes"]} />
+              <FormControl label="Known allergies">
+                <SelectBox value={form.allergies} onChange={(value) => updateForm("allergies", value)} options={["Unknown", "No", "Yes"]} />
+              </FormControl>
+              <FormControl label="Current medications">
+                <SelectBox value={form.currentMeds} onChange={(value) => updateForm("currentMeds", value)} options={["Unknown", "No", "Yes"]} />
+              </FormControl>
+              <FormControl label="Antibiotics in last 90 days">
+                <SelectBox value={form.recentAntibiotics} onChange={(value) => updateForm("recentAntibiotics", value)} options={["Unknown", "No", "Yes"]} />
+              </FormControl>
+              <FormControl label="Culture collection ordered">
+                <SelectBox value={form.cultureOrdered} onChange={(value) => updateForm("cultureOrdered", value)} options={["No", "Yes"]} />
+              </FormControl>
             </div>
             <div className="mt-5 flex flex-wrap justify-end gap-3">
               <Button variant="outline" onClick={() => setNotice("Draft intake saved for this demo session.")}>Save draft</Button>
