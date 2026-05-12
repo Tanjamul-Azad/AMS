@@ -784,6 +784,8 @@ function NewPatientIntakePage({ navigate, onCreatePatient, role = roles[0] }) {
   const [mrn, setMrn] = useState("");
   const [summary, setSummary] = useState("Transfer summary: ceftriaxone started yesterday, blood culture pending, no allergy list attached.");
   const [verified, setVerified] = useState({});
+  const [documentCategory, setDocumentCategory] = useState("Previous prescription");
+  const [uploadedDocuments, setUploadedDocuments] = useState([]);
   const extractedFields = [
     ["Prior antibiotics", "Ceftriaxone started at transferring facility"],
     ["Culture status", "Blood culture pending"],
@@ -799,6 +801,26 @@ function NewPatientIntakePage({ navigate, onCreatePatient, role = roles[0] }) {
   const uncertaintyCount = unknowns.filter(([, missing]) => missing).length;
   const confidence = pathway === "Existing EHR Patient" ? 86 : pathway === "Transferred Patient" ? 42 : 35;
   const updateForm = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const addUploadedDocuments = (files) => {
+    const nextDocuments = Array.from(files || []).map((file) => ({
+      id: `${file.name}-${file.size}-${Date.now()}`,
+      name: file.name,
+      type: file.type || "Unknown file type",
+      category: documentCategory,
+      source: "Patient provided",
+      status: "Needs verification",
+    }));
+    if (nextDocuments.length) {
+      setUploadedDocuments((current) => [...current, ...nextDocuments]);
+      setNotice(`${nextDocuments.length} document${nextDocuments.length > 1 ? "s" : ""} added as unverified patient-provided evidence.`);
+    }
+  };
+  const updateDocumentStatus = (id, status) => {
+    setUploadedDocuments((current) => current.map((doc) => doc.id === id ? { ...doc, status } : doc));
+  };
+  const removeDocument = (id) => {
+    setUploadedDocuments((current) => current.filter((doc) => doc.id !== id));
+  };
   const submitPatient = () => {
     const id = pathway === "Existing EHR Patient" && mrn.trim() ? `P-${mrn.trim()}` : form.tempId;
     const patient = {
@@ -830,8 +852,10 @@ function NewPatientIntakePage({ navigate, onCreatePatient, role = roles[0] }) {
       cultures: [["Initial culture order", form.cultureOrdered === "Yes" ? "Ordered" : "Not confirmed", "-", "Intake", form.cultureOrdered === "Yes" ? "Pending" : "Missing"]],
       medications: [[pathway === "Transferred Patient" ? "Prior facility therapy" : "Empiric therapy", "-", "-", "Pending verification", "Intake"]],
       labs: [["Vitals screen", "High priority", "Manual intake", "Now"]],
+      uploadedDocuments: uploadedDocuments.map((doc) => ({ ...doc, status: doc.status === "Reviewed" ? "Reviewed" : "Unverified" })),
       timeline: [
         ["Now", pathway, "Patient entered through manual intake workflow."],
+        ["Now", "Previous documents", uploadedDocuments.length ? `${uploadedDocuments.length} patient-provided document(s) uploaded; verification required.` : "No previous prescription or report uploaded."],
         ["Now", "Uncertainty scorer", `${uncertaintyCount} critical history fields require confirmation.`],
         ["Now", "Escalation path", pathway === "Existing EHR Patient" ? "EHR timeline imported." : "Human review required before high-confidence recommendation."],
       ],
@@ -971,6 +995,38 @@ function NewPatientIntakePage({ navigate, onCreatePatient, role = roles[0] }) {
                 <SelectBox value={form.cultureOrdered} onChange={(value) => updateForm("cultureOrdered", value)} options={["No", "Yes"]} />
               </FormControl>
             </div>
+          </ClinicalPanel>
+          <ClinicalPanel title="Previous Documents">
+            <p className="mb-4 text-sm leading-6 text-slate-600">Upload photos or PDFs of previous prescriptions, lab reports, or discharge documents. These remain unverified until reviewed by the doctor.</p>
+            <div className="grid gap-3 md:grid-cols-[240px_1fr]">
+              <FormControl label="Document category">
+                <SelectBox value={documentCategory} onChange={setDocumentCategory} options={["Previous prescription", "Lab report", "Culture report", "Discharge summary", "Other"]} />
+              </FormControl>
+              <FormControl label="Upload image or PDF">
+                <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-600 hover:border-blue-300 hover:bg-blue-50">
+                  <span className="flex items-center gap-2"><FileText className="h-4 w-4" />Choose JPG, PNG, WEBP, or PDF files</span>
+                  <input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={(event) => { addUploadedDocuments(event.target.files); event.target.value = ""; }} />
+                  <span className="font-semibold text-blue-700">Browse</span>
+                </label>
+              </FormControl>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {uploadedDocuments.length === 0 ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">No previous documents uploaded.</div>
+              ) : uploadedDocuments.map((doc) => (
+                <div key={doc.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2"><FileText className="h-4 w-4 text-slate-500" /><p className="font-bold">{doc.name}</p><Badge tone="neutral">{doc.category}</Badge><Badge tone={doc.status === "Reviewed" ? "safe" : "review"}>{doc.status}</Badge></div>
+                    <p className="mt-1 text-sm text-slate-600">{doc.source} · {doc.type}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={() => setNotice(`${doc.name} preview is represented as metadata in this frontend prototype.`)}>Preview</Button>
+                    <Button variant={doc.status === "Reviewed" ? "success" : "soft"} onClick={() => updateDocumentStatus(doc.id, "Reviewed")}>Mark reviewed</Button>
+                    <Button variant="ghost" className="px-3" aria-label={`Remove ${doc.name}`} onClick={() => removeDocument(doc.id)}><X className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
             <div className="mt-5 flex flex-wrap justify-end gap-3">
               <Button variant="outline" onClick={() => setNotice("Draft intake saved for this demo session.")}>Save draft</Button>
               <Button onClick={submitPatient}>Create patient and escalate</Button>
@@ -1068,6 +1124,7 @@ function PatientOverview({ id, navigate, patientsList = patients, role = roles[0
           </ClinicalPanel>
           <DataPanel title="Microbiology / Culture Results" rows={patient.cultures} headers={["Specimen", "Result", "Organism", "Collected", "Status"]} />
           <DataPanel title="Key Labs" rows={patient.labs} headers={["Test", "Result", "Ref. range", "Date"]} />
+          <UploadedReportsPanel documents={patient.uploadedDocuments} />
           <DataPanel title="Current Medications" rows={patient.medications} headers={["Medication", "Dose / Route", "Frequency", "Indication", "Start date"]} />
           <ClinicalPanel title="Clinical Timeline">
             <div className="space-y-4">
@@ -1103,6 +1160,26 @@ function DataPanel({ title, headers, rows }) {
   return (
     <ClinicalPanel title={title}>
       <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead className="text-xs text-slate-500"><tr>{headers.map((h) => <th key={h} className="py-2">{h}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index} className="border-t border-slate-100">{row.map((cell, i) => <td key={`${cell}-${i}`} className="py-3">{cell === "Final" ? <Badge tone="safe">Final</Badge> : cell === "Pending" ? <Badge tone="review">Pending</Badge> : cell}</td>)}</tr>)}</tbody></table></div>
+    </ClinicalPanel>
+  );
+}
+
+function UploadedReportsPanel({ documents = [] }) {
+  return (
+    <ClinicalPanel title="Uploaded Reports">
+      {documents.length === 0 ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">No previous documents uploaded.</div>
+      ) : (
+        <div className="space-y-3">
+          {documents.map((doc) => (
+            <div key={doc.id || doc.name} className="rounded-lg border border-slate-200 p-4">
+              <div className="flex flex-wrap items-center gap-2"><FileText className="h-4 w-4 text-slate-500" /><p className="font-bold">{doc.name}</p><Badge tone="neutral">{doc.category}</Badge><Badge tone={doc.status === "Reviewed" ? "safe" : "review"}>{doc.status}</Badge></div>
+              <p className="mt-2 text-sm text-slate-600">Source: {doc.source || "Patient provided"} · Uploaded during intake</p>
+              <p className="mt-1 text-xs font-semibold text-amber-700">Not treated as verified clinical fact until reviewed.</p>
+            </div>
+          ))}
+        </div>
+      )}
     </ClinicalPanel>
   );
 }
