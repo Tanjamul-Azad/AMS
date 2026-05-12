@@ -1,8 +1,7 @@
 export const roles = [
-  "Attending Physician",
-  "Infectious Disease Specialist",
-  "Clinical Pharmacist",
-  "Stewardship Admin",
+  "Duty Doctor / Medical Officer",
+  "Consultant / ID Specialist",
+  "Admin",
 ];
 
 export const patients = [

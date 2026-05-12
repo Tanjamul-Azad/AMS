@@ -51,7 +51,26 @@ const navItems = [
   ["Reviews", "/reviews", ClipboardList],
   ["Reports", "/reports", LineChart],
   ["Settings", "/settings", Settings],
+  ["Help", "/help", HelpCircle],
 ];
+
+const roleProfiles = {
+  "Duty Doctor / Medical Officer": {
+    tag: "Initial operator",
+    description: "Enters patients, checks recommendations, and requests consultant review.",
+    nav: ["Dashboard", "Patients", "Alerts Center", "Recommendations", "Reviews", "Help"],
+  },
+  "Consultant / ID Specialist": {
+    tag: "Clinical authority",
+    description: "Approves escalations, restricted antibiotics, and emergency override cases.",
+    nav: ["Dashboard", "Reviews", "Alerts Center", "Recommendations", "Patients", "Reports", "Help"],
+  },
+  Admin: {
+    tag: "Governance only",
+    description: "Manages users, reports, rules, and setup without clinical approval power.",
+    nav: ["Dashboard", "Reports", "Settings", "Help"],
+  },
+};
 
 function useRoute() {
   const [path, setPath] = useState(window.location.pathname === "/" ? "/login" : window.location.pathname);
@@ -192,6 +211,8 @@ function Confidence({ value }) {
 function AppShell({ children, path, navigate, role, onLogout, notificationCount = 3 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const allowedNav = roleProfiles[role]?.nav || roleProfiles[roles[0]].nav;
+  const visibleNavItems = navItems.filter(([label]) => allowedNav.includes(label));
   const closeMobileAndNavigate = (href) => {
     navigate(href);
     setMobileOpen(false);
@@ -203,7 +224,7 @@ function AppShell({ children, path, navigate, role, onLogout, notificationCount 
           <Logo />
         </div>
         <nav className="space-y-1 p-4">
-          {navItems.map(([label, href, Icon]) => {
+          {visibleNavItems.map(([label, href, Icon]) => {
             const active = path === href || (href !== "/dashboard" && path.startsWith(href));
             return (
               <button
@@ -408,11 +429,16 @@ function Login({ navigate, role, setRole }) {
             </div>
 
             <div className="mt-5">
-              <p className="mb-2 text-sm font-bold">Select your role</p>
-              <div className="grid grid-cols-2 gap-2">
+              <p className="mb-1 text-sm font-bold">Select your role</p>
+              <p className="mb-3 text-xs leading-5 text-slate-500">For Bangladesh workflow, the duty doctor starts the case and consultants approve high-risk decisions.</p>
+              <div className="grid gap-2">
                 {roles.map((item) => (
-                  <button key={item} onClick={() => setRole(item)} className={cx("focus-ring rounded-md border px-3 py-2.5 text-left text-xs font-bold transition", role === item ? "border-blue-600 bg-blue-50 text-blue-800" : "border-slate-200 text-slate-600 hover:border-blue-200")}>
-                    {item}
+                  <button key={item} onClick={() => setRole(item)} className={cx("focus-ring rounded-md border px-3 py-3 text-left transition", role === item ? "border-blue-600 bg-blue-50 text-blue-900" : "border-slate-200 text-slate-700 hover:border-blue-200")}>
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-bold">{item}</span>
+                      <Badge tone={item === "Admin" ? "neutral" : item === "Consultant / ID Specialist" ? "escalated" : "switch"}>{roleProfiles[item].tag}</Badge>
+                    </span>
+                    <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500">{roleProfiles[item].description}</span>
                   </button>
                 ))}
               </div>
@@ -463,28 +489,49 @@ function PatientBadge({ patient }) {
   return <Badge tone={tone}>{patient.status}</Badge>;
 }
 
-function Dashboard({ navigate }) {
-  const queue = patients.slice(0, 5);
+function Dashboard({ navigate, role, patientsList = patients }) {
+  if (role === "Consultant / ID Specialist") return <ConsultantDashboard navigate={navigate} />;
+  if (role === "Admin") return <AdminDashboard navigate={navigate} />;
+  return <DutyDoctorDashboard navigate={navigate} patientsList={patientsList} />;
+}
+
+function DutyDoctorDashboard({ navigate, patientsList = patients }) {
+  const queue = patientsList.slice(0, 5);
   return (
     <>
-      <PageTitle title="Dashboard" subtitle="Overview of antimicrobial therapy reviews and recommendations" />
+      <PageTitle
+        title="Duty Doctor Dashboard"
+        subtitle="Initial patient entry, recommendation review, and consultant escalation."
+        actions={<Button onClick={() => navigate("/patients/new")}><Plus className="h-4 w-4" />Add New Patient</Button>}
+      />
+      <Card className="mb-5 border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-900">
+        You can start patient intake and request review. High-risk, low-confidence, restricted antibiotic, or Code Sepsis decisions require consultant approval.
+      </Card>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Users} label="Patients under review" value="48" delta="↑ 8 from yesterday" />
-        <StatCard icon={Pill} label="Active antimicrobial cases" value="32" delta="— 0 from yesterday" tone="switch" />
-        <StatCard icon={AlertTriangle} label="High-priority alerts" value="7" delta="↑ 2 from yesterday" tone="critical" />
-        <StatCard icon={ShieldCheck} label="Cases needing escalation" value="5" delta="↑ 1 from yesterday" tone="escalated" />
+        <StatCard icon={Users} label="Today's assigned patients" value={`${patientsList.length}`} delta="Duty roster" />
+        <StatCard icon={ClipboardList} label="Pending intake / missing data" value="6" delta="Needs completion" tone="review" />
+        <StatCard icon={Pill} label="Recommendations awaiting action" value="9" delta="Review before order" tone="switch" />
+        <StatCard icon={ShieldCheck} label="Cases escalated to consultant" value="5" delta="Approval required" tone="escalated" />
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_420px]">
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-xl font-bold">Patient Queue <Badge>32 active cases</Badge></h3>
+            <h3 className="text-xl font-bold">Today’s Assigned Patients <Badge>{queue.length} visible</Badge></h3>
             <button onClick={() => navigate("/patients")} className="font-semibold text-blue-700">View all</button>
           </div>
           <PatientTable patients={queue} navigate={navigate} compact />
         </Card>
         <div className="grid gap-5">
-          <ChartCard />
-          <ReviewActivity />
+          <ClinicalPanel title="Quick Actions">
+            <div className="grid gap-3">
+              <Button className="w-full" onClick={() => navigate("/patients/new")}><Plus className="h-4 w-4" />Add new / transfer patient</Button>
+              <Button variant="outline" className="w-full" onClick={() => navigate("/alerts")}>Open high-priority alerts</Button>
+              <Button variant="outline" className="w-full" onClick={() => navigate("/reviews")}>Request consultant review</Button>
+            </div>
+          </ClinicalPanel>
+          <ClinicalPanel title="Permission Guardrails">
+            <List items={["Can enter and update patient facts.", "Can view recommendations and request review.", "Cannot approve high-risk or emergency override decisions alone."]} />
+          </ClinicalPanel>
         </div>
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
@@ -518,6 +565,73 @@ function Dashboard({ navigate }) {
           <SectionHeader title="Recent Reports" action={() => navigate("/reports")} />
           {reports.slice(0, 3).map((report) => <div key={report[0]} className="flex items-center justify-between border-b border-slate-100 py-4 last:border-0"><div className="flex items-center gap-3"><FileText className="h-6 w-6 text-slate-500" /><div><p className="font-bold">{report[0]}</p><p className="text-sm text-slate-500">{report[1]}</p></div></div><Badge>{report[4]}</Badge></div>)}
         </Card>
+      </div>
+    </>
+  );
+}
+
+function ConsultantDashboard({ navigate }) {
+  const escalationQueue = reviews.filter((item) => item.status !== "Reviewed");
+  const lowConfidence = reviews.filter((item) => item.confidence < 60);
+  return (
+    <>
+      <PageTitle title="Consultant / ID Dashboard" subtitle="Escalation review, restricted antibiotic approval, and critical-case oversight." />
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <StatCard icon={ClipboardList} label="Escalation queue" value={`${escalationQueue.length}`} delta="Needs decision" tone="review" />
+        <StatCard icon={AlertTriangle} label="Critical / Code Sepsis cases" value="3" delta="Immediate review" tone="critical" />
+        <StatCard icon={ShieldCheck} label="Low-confidence recommendations" value={`${lowConfidence.length}`} delta="Specialist check" tone="escalated" />
+        <StatCard icon={Pill} label="Restricted antibiotic approvals" value="7" delta="Pending approval" tone="switch" />
+        <StatCard icon={Users} label="Waiting specialist decision" value="5" delta="Assigned to ID" />
+      </div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
+        <Card className="p-5">
+          <SectionHeader title="Escalation Queue" action={() => navigate("/reviews")} />
+          <ReviewTable reviews={escalationQueue} navigate={navigate} />
+        </Card>
+        <div className="space-y-5">
+          <ClinicalPanel title="Specialist Quick Actions">
+            <div className="grid gap-3">
+              <Button className="w-full" onClick={() => navigate("/reviews")}>Open review queue</Button>
+              <Button variant="outline" className="w-full" onClick={() => navigate("/recommendations")}>Approve or modify recommendation</Button>
+              <Button variant="outline" className="w-full" onClick={() => navigate("/alerts")}>Send back for more info</Button>
+            </div>
+          </ClinicalPanel>
+          <ClinicalPanel title="Critical Reasons">
+            <List items={["Code Sepsis emergency override", "Resistant organism or restricted drug", "Severe allergy or contraindication", "Transfer case with uncertain history"]} />
+          </ClinicalPanel>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function AdminDashboard({ navigate }) {
+  return (
+    <>
+      <PageTitle title="Admin Dashboard" subtitle="Governance, reporting, and system configuration. Clinical approvals are disabled for this role." />
+      <Card className="mb-5 border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">
+        Admin can configure the prototype and view reports, but cannot create prescriptions, approve recommendations, or operate Code Sepsis.
+      </Card>
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <StatCard icon={Users} label="Users and access" value="24" delta="Role managed" />
+        <StatCard icon={Settings} label="Clinical rule setup" value="18" delta="Active rules" tone="switch" />
+        <StatCard icon={LineChart} label="Local antibiogram data" value="2024" delta="Current dataset" tone="review" />
+        <StatCard icon={FileText} label="Reports and audit" value="12" delta="Generated" />
+        <StatCard icon={ShieldCheck} label="System configuration" value="Safe" delta="No clinical approval power" tone="escalated" />
+      </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+        <ClinicalPanel title="Governance Areas">
+          <List items={["Manage users and role access", "Maintain hospital-level rules", "Update local resistance data", "Review audit and report history"]} />
+        </ClinicalPanel>
+        <ClinicalPanel title="Admin Actions">
+          <div className="grid gap-3">
+            <Button onClick={() => navigate("/settings")}>Open system settings</Button>
+            <Button variant="outline" onClick={() => navigate("/reports")}>Open reports</Button>
+          </div>
+        </ClinicalPanel>
+        <ClinicalPanel title="Clinical Access Boundary">
+          <List items={["No patient prescribing workflow", "No recommendation approval", "No emergency protocol activation"]} />
+        </ClinicalPanel>
       </div>
     </>
   );
@@ -584,7 +698,7 @@ function ReviewActivity() {
   );
 }
 
-function PatientsPage({ navigate, patientsList = patients }) {
+function PatientsPage({ navigate, patientsList = patients, role = roles[0] }) {
   const [query, setQuery] = useState("");
   const [ward, setWard] = useState("All wards");
   const [status, setStatus] = useState("All statuses");
@@ -602,7 +716,7 @@ function PatientsPage({ navigate, patientsList = patients }) {
       <PageTitle
         title="Patients"
         subtitle="Search and review patients receiving antimicrobial therapy"
-        actions={<Button onClick={() => navigate("/patients/new")}><Plus className="h-4 w-4" />Add New Patient</Button>}
+        actions={role === "Admin" ? <Badge tone="neutral">Read-only admin view</Badge> : <Button onClick={() => navigate("/patients/new")}><Plus className="h-4 w-4" />Add New Patient</Button>}
       />
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Users} label="Total patients" value={`${patientsList.length}`} delta="Current workspace" />
@@ -620,7 +734,7 @@ function PatientsPage({ navigate, patientsList = patients }) {
           </Card>
           {notice && <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">{notice}</div>}
           <Card className="p-5">
-            <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-bold">Patient {viewMode} <Badge>{filtered.length} visible</Badge></h3><div className="flex gap-2"><Button variant="ghost" onClick={() => setNotice(`${filtered.length} visible patients exported for this demo session.`)}><Download className="h-4 w-4" />Export</Button><Button variant={viewMode === "List" ? "soft" : "ghost"} className="px-3" onClick={() => { setViewMode("List"); setNotice("List view selected."); }}><Menu className="h-4 w-4" /></Button><Button variant={viewMode === "Grid" ? "soft" : "ghost"} className="px-3" onClick={() => { setViewMode("Grid"); setNotice("Grid view selected."); }}><Grid2X2 className="h-4 w-4" /></Button></div></div>
+            <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-bold">Patient {viewMode} <Badge>{filtered.length} visible</Badge></h3><div className="flex gap-2">{role !== "Admin" && <Button variant="outline" onClick={() => navigate("/patients/new")}><Plus className="h-4 w-4" />Add New Patient</Button>}<Button variant="ghost" onClick={() => setNotice(`${filtered.length} visible patients exported for this demo session.`)}><Download className="h-4 w-4" />Export</Button><Button variant={viewMode === "List" ? "soft" : "ghost"} className="px-3" onClick={() => { setViewMode("List"); setNotice("List view selected."); }}><Menu className="h-4 w-4" /></Button><Button variant={viewMode === "Grid" ? "soft" : "ghost"} className="px-3" onClick={() => { setViewMode("Grid"); setNotice("Grid view selected."); }}><Grid2X2 className="h-4 w-4" /></Button></div></div>
             <PatientTable patients={filtered} navigate={navigate} />
             <div className="mt-4 flex items-center justify-between text-sm text-slate-500"><span>Showing 1-{filtered.length} of {patientsList.length} patients</span><div className="flex gap-2">{[1, 2, 3].map((item) => <Button key={item} variant={page === item ? "outline" : "ghost"} className="h-9 px-3" onClick={() => { setPage(item); setNotice(`Page ${item} selected.`); }}>{item}</Button>)}</div></div>
           </Card>
@@ -648,7 +762,7 @@ function RightRail({ navigate, patientsList = patients }) {
   );
 }
 
-function NewPatientIntakePage({ navigate, onCreatePatient }) {
+function NewPatientIntakePage({ navigate, onCreatePatient, role = roles[0] }) {
   const [pathway, setPathway] = useState("New Patient / No Records");
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState({
@@ -733,6 +847,15 @@ function NewPatientIntakePage({ navigate, onCreatePatient }) {
         subtitle="Manual entry path for new, transferred, or EHR-linked patients."
         actions={<Button variant="outline" onClick={() => navigate("/patients")}>Back to Patients</Button>}
       />
+      {role === "Admin" ? (
+        <Card className="border-slate-200 bg-slate-50 p-8 text-center">
+          <ShieldCheck className="mx-auto h-10 w-10 text-slate-500" />
+          <h3 className="mt-4 text-xl font-bold">Admin cannot create clinical intake records</h3>
+          <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-600">This role is limited to governance, reports, and configuration. Patient entry must be performed by the Duty Doctor / Medical Officer.</p>
+          <Button className="mt-5" onClick={() => navigate("/dashboard")}>Return to admin dashboard</Button>
+        </Card>
+      ) : (
+      <>
       {notice && <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">{notice}</div>}
       <Card className="mb-5 border-amber-200 bg-amber-50 p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -855,15 +978,22 @@ function NewPatientIntakePage({ navigate, onCreatePatient }) {
           </ClinicalPanel>
         </div>
       </div>
+      </>
+      )}
     </>
   );
 }
 
-function PatientOverview({ id, navigate, patientsList = patients }) {
+function PatientOverview({ id, navigate, patientsList = patients, role = roles[0] }) {
   const patient = getPatient(id, patientsList);
   const [notice, setNotice] = useState("");
   const [emergencyActive, setEmergencyActive] = useState(false);
+  const isAdmin = role === "Admin";
   const activateCodeSepsis = () => {
+    if (isAdmin) {
+      setNotice("Admin cannot operate Code Sepsis or approve clinical decisions.");
+      return;
+    }
     setEmergencyActive(true);
     setNotice("Code Sepsis activated: emergency override is routing this case to the 1-hour sepsis protocol and notifying the ASP team.");
   };
@@ -872,9 +1002,10 @@ function PatientOverview({ id, navigate, patientsList = patients }) {
       <PageTitle
         title="Patient Overview"
         subtitle={`Dashboard > Patients > ${patient.id}`}
-        actions={<><Button variant="success" onClick={() => navigate(`/patients/${patient.id}/recommendation`)}><ShieldCheck className="h-4 w-4" />View recommendation</Button><Button variant="outline" onClick={() => setNotice(`Note composer opened for ${patient.id}.`)}><Plus className="h-4 w-4" />Add note</Button><Button onClick={() => navigate(`/patients/${patient.id}/review`)}>Request review</Button><Button variant="critical" onClick={activateCodeSepsis}><AlertTriangle className="h-4 w-4" />Code Sepsis</Button></>}
+        actions={<><Button variant="success" onClick={() => navigate(`/patients/${patient.id}/recommendation`)}><ShieldCheck className="h-4 w-4" />View recommendation</Button><Button variant="outline" onClick={() => setNotice(isAdmin ? "Admin cannot add clinical notes." : `Note composer opened for ${patient.id}.`)}><Plus className="h-4 w-4" />Add note</Button><Button onClick={() => isAdmin ? setNotice("Admin cannot request or approve clinical review.") : navigate(`/patients/${patient.id}/review`)}>Request review</Button><Button variant="critical" onClick={activateCodeSepsis}><AlertTriangle className="h-4 w-4" />Code Sepsis</Button></>}
       />
       {notice && <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-800">{notice}</div>}
+      {isAdmin && <Card className="mb-5 border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">Admin view is read-only for patient care. Clinical actions are disabled in this prototype.</Card>}
       {emergencyActive && (
         <Card className="mb-5 border-red-300 bg-red-50 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -980,14 +1111,18 @@ function List({ items }) {
   return <ul className="space-y-3 text-sm">{items.map((item) => <li key={item} className="flex gap-2"><CheckCircle2 className="h-5 w-5 shrink-0 text-teal-600" /><span>{item}</span></li>)}</ul>;
 }
 
-function RecommendationDetail({ id, navigate }) {
+function RecommendationDetail({ id, navigate, role = roles[0] }) {
   const rec = getRecommendation(id);
   const patient = getPatient(rec.patientId);
   const [decision, setDecision] = useState(rec.status);
   const [comment, setComment] = useState("");
+  const isAdmin = role === "Admin";
+  const needsConsultantApproval = role === "Duty Doctor / Medical Officer" && (rec.confidence < 70 || patient.reviewStatus === "escalated");
+  const clinicalActionNotice = isAdmin ? "Admin cannot approve clinical decisions." : "Requires consultant approval for this high-risk recommendation.";
   return (
     <>
       <PageTitle title="Treatment Recommendation" subtitle={`Recommendation ID: ${rec.id}`} actions={<Button variant="outline" onClick={() => navigate(`/patients/${patient.id}`)}>View full profile</Button>} />
+      {isAdmin && <Card className="mb-5 border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">Admin view is read-only. Recommendation approval and clinical routing actions are disabled.</Card>}
       <PatientSummary patient={patient} />
       <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_1fr_330px]">
         <TherapyCard title="Current therapy" therapy={rec.current} badge="Active" />
@@ -1005,9 +1140,10 @@ function RecommendationDetail({ id, navigate }) {
         <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
           <div><p className="font-bold">Expected review date</p><p className="mt-2 text-xl font-bold">May 15, 2024</p><p className="text-sm text-slate-500">Within 48-72 hours</p></div>
           <div>
+            {(isAdmin || needsConsultantApproval) && <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">{clinicalActionNotice}</div>}
             <label className="text-sm font-semibold">Clinician comments</label>
             <textarea value={comment} onChange={(event) => setComment(event.target.value)} className="mt-2 h-24 w-full rounded-md border border-slate-200 p-3 text-sm outline-none focus:border-blue-300" placeholder="Add your notes or rationale..." />
-            <div className="mt-3 flex flex-wrap justify-end gap-3"><Button variant="outline" onClick={() => setDecision("Specialist review requested")}>Request specialist review</Button><Button variant="outline" onClick={() => setDecision("Modified plan")}>Modify plan</Button><Button onClick={() => setDecision("Accepted")}>Accept recommendation</Button></div>
+            <div className="mt-3 flex flex-wrap justify-end gap-3"><Button variant="outline" onClick={() => setDecision(isAdmin ? "Admin read-only" : "Specialist review requested")}>Request specialist review</Button><Button variant="outline" onClick={() => setDecision(isAdmin ? "Admin read-only" : needsConsultantApproval ? "Consultant approval required" : "Modified plan")}>Modify plan</Button><Button variant={isAdmin || needsConsultantApproval ? "soft" : "primary"} onClick={() => setDecision(isAdmin ? "Admin cannot approve clinical decisions" : needsConsultantApproval ? "Requires consultant approval" : "Accepted")}>{isAdmin ? "Admin read-only" : needsConsultantApproval ? "Requires consultant approval" : "Accept recommendation"}</Button></div>
           </div>
         </div>
       </Card>
@@ -1045,16 +1181,18 @@ function ReviewTable({ reviews: list, navigate }) {
   return <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-sm"><thead className="text-xs text-slate-500"><tr className="border-b"><th className="py-3">Case ID</th><th>Patient</th><th>Ward</th><th>Diagnosis</th><th>Review reason</th><th>Confidence</th><th>Assigned reviewer</th><th>Due time</th><th>Status</th></tr></thead><tbody>{list.map((review) => { const patient = getPatient(review.patientId); return <tr key={review.id} onClick={() => navigate(`/reviews/${review.id}`)} className="cursor-pointer border-b border-slate-100 hover:bg-blue-50/40"><td className="py-4 font-bold text-blue-950">{patient.id}</td><td>{patient.name}<br /><span className="text-slate-500">{patient.ageSex}</span></td><td>{patient.ward}</td><td>{patient.diagnosis}</td><td>{review.reason}</td><td><Confidence value={review.confidence} /></td><td>{review.reviewer}</td><td>{review.due}</td><td><Badge tone={review.status === "Escalated" ? "escalated" : review.status === "In progress" ? "switch" : "review"}>{review.status}</Badge></td></tr>; })}</tbody></table></div>;
 }
 
-function ReviewDetail({ id, navigate }) {
+function ReviewDetail({ id, navigate, role = roles[0] }) {
   const review = getReview(id);
   const patient = getPatient(review.patientId);
   const [status, setStatus] = useState(review.status);
   const [note, setNote] = useState("");
   const [reviewer, setReviewer] = useState(review.reviewer);
   const [priority, setPriority] = useState(review.priority);
+  const isAdmin = role === "Admin";
   return (
     <>
       <PageTitle title="Escalation Review" subtitle={<button onClick={() => navigate("/reviews")} className="text-blue-700">← Back to Queue</button>} actions={<Badge tone="review">Needs specialist review</Badge>} />
+      {isAdmin && <Card className="mb-5 border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">Admin view is read-only. Recommendation approval and clinical routing actions are disabled.</Card>}
       <PatientSummary patient={patient} />
       <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_360px]">
         <div className="space-y-5">
@@ -1067,7 +1205,7 @@ function ReviewDetail({ id, navigate }) {
         </div>
         <div className="space-y-5">
           <ClinicalPanel title="Assign review"><SelectBox value={reviewer} onChange={(value) => { setReviewer(value); setStatus(`Assigned to ${value}`); }} options={["Dr. Michael Anderson", "Dr. Priya Patel", "Dr. James Lee"]} /><div className="mt-4"><SelectBox value={priority} onChange={(value) => { setPriority(value); setStatus(`${value} priority selected`); }} options={["High", "Moderate", "Low"]} /></div><textarea className="mt-4 h-28 w-full rounded-md border border-slate-200 p-3 text-sm outline-none" placeholder="Add notes for the reviewer..." /></ClinicalPanel>
-          <ClinicalPanel title="Actions"><div className="space-y-3"><Button className="w-full" onClick={() => setStatus("Consult requested")}>Request consult</Button><Button variant="success" className="w-full" onClick={() => setStatus("Reviewed")}>Mark reviewed</Button><Button variant="danger" className="w-full" onClick={() => setStatus("Needs more info")}>Send back for more info</Button><p className="text-center text-sm font-semibold text-slate-600">Current state: {status}</p></div></ClinicalPanel>
+          <ClinicalPanel title="Actions"><div className="space-y-3"><Button className="w-full" variant={isAdmin ? "soft" : "primary"} onClick={() => setStatus(isAdmin ? "Admin cannot request consult" : "Consult requested")}>Request consult</Button><Button variant={isAdmin ? "soft" : "success"} className="w-full" onClick={() => setStatus(isAdmin ? "Admin cannot mark reviewed" : "Reviewed")}>Mark reviewed</Button><Button variant={isAdmin ? "soft" : "danger"} className="w-full" onClick={() => setStatus(isAdmin ? "Admin cannot send clinical case back" : "Needs more info")}>Send back for more info</Button><p className="text-center text-sm font-semibold text-slate-600">Current state: {status}</p></div></ClinicalPanel>
         </div>
       </div>
     </>
@@ -1178,14 +1316,14 @@ function SettingsPage({ navigate }) {
       {saved && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{saved}</div>}
       <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
         <div className="space-y-5">
-          <SettingsSection icon={User} title="User Profile" text="Manage your personal information and preferences."><div className="grid gap-3 md:grid-cols-2"><Field value="Dr. Sarah Johnson" onChange={() => {}} /><SelectBox value="Infectious Diseases Physician" onChange={() => {}} options={["Infectious Diseases Physician", "Clinical Pharmacist", "Stewardship Admin"]} /><Field value="sarah.johnson@cityviewmc.org" onChange={() => {}} /><SelectBox value="(UTC-05:00) Eastern Time" onChange={() => {}} options={["(UTC-05:00) Eastern Time", "(UTC+06:00) Dhaka"]} /></div></SettingsSection>
+          <SettingsSection icon={User} title="User Profile" text="Manage your personal information and preferences."><div className="grid gap-3 md:grid-cols-2"><Field value="Dr. Sarah Johnson" onChange={() => {}} /><SelectBox value="Consultant / ID Specialist" onChange={() => {}} options={roles} /><Field value="sarah.johnson@cityviewmc.org" onChange={() => {}} /><SelectBox value="(UTC-05:00) Eastern Time" onChange={() => {}} options={["(UTC-05:00) Eastern Time", "(UTC+06:00) Dhaka"]} /></div></SettingsSection>
           <SettingsSection icon={Bell} title="Notification Preferences" text="Choose how and when you receive alerts."><Toggle label="Email notifications" checked={email} setChecked={setEmail} /><Toggle label="In-app notifications" checked={inApp} setChecked={setInApp} /><Toggle label="High-priority alerts" checked setChecked={() => {}} /></SettingsSection>
           <SettingsSection icon={ClipboardList} title="Review Workflow" text="Set review and escalation preferences."><SelectBox value="Safe to continue" onChange={() => {}} options={["Safe to continue", "Needs review"]} /><SelectBox value="After 24 hours" onChange={() => {}} options={["After 24 hours", "After 48 hours", "After 72 hours"]} /></SettingsSection>
           <SettingsSection icon={Stethoscope} title="Clinical Preferences" text="Customize clinical defaults."><Toggle label="Show generics" checked setChecked={() => {}} /><Toggle label="Include renal dose alerts" checked setChecked={() => {}} /></SettingsSection>
           <div className="flex justify-end gap-3"><Button variant="ghost" onClick={() => setSaved("Changes discarded.")}>Discard changes</Button><Button onClick={() => setSaved("All settings saved for this demo session.")}>Save all changes</Button></div>
         </div>
         <div className="space-y-5">
-          <ClinicalPanel title="Your Account"><div className="flex items-center gap-4"><div className="grid h-16 w-16 place-items-center rounded-full bg-amber-100 font-bold">SJ</div><div><p className="font-bold">Dr. Sarah Johnson</p><p className="text-sm text-slate-500">Infectious Diseases Physician</p></div></div><div className="mt-5"><Info label="Role" value="Clinician" /><Info label="Permissions" value="AMS Clinician" /><Info label="Last sign in" value="May 13, 2024 8:24 AM" /></div></ClinicalPanel>
+          <ClinicalPanel title="Your Account"><div className="flex items-center gap-4"><div className="grid h-16 w-16 place-items-center rounded-full bg-amber-100 font-bold">SJ</div><div><p className="font-bold">Dr. Sarah Johnson</p><p className="text-sm text-slate-500">Consultant / ID Specialist</p></div></div><div className="mt-5"><Info label="Role" value="Clinical authority" /><Info label="Permissions" value="Escalation review and specialist approval" /><Info label="Last sign in" value="May 13, 2024 8:24 AM" /></div></ClinicalPanel>
           <ClinicalPanel title="Quick Links">
             <div className="space-y-2">
               {[
@@ -1240,7 +1378,7 @@ function NotFound({ navigate }) {
 
 export default function App() {
   const { path, navigate } = useRoute();
-  const [role, setRole] = useState(roles[1]);
+  const [role, setRole] = useState(roles[0]);
   const [createdPatients, setCreatedPatients] = useState([]);
   const allPatients = useMemo(() => [...createdPatients, ...patients], [createdPatients]);
   const addPatient = (patient) => {
@@ -1249,9 +1387,9 @@ export default function App() {
   const handleLogout = () => navigate("/login");
   const content = useMemo(() => {
     if (path === "/login") return <Login navigate={navigate} role={role} setRole={setRole} />;
-    if (path === "/dashboard") return <Dashboard navigate={navigate} />;
-    if (path === "/patients") return <PatientsPage navigate={navigate} patientsList={allPatients} />;
-    if (path === "/patients/new") return <NewPatientIntakePage navigate={navigate} onCreatePatient={addPatient} />;
+    if (path === "/dashboard") return <Dashboard navigate={navigate} role={role} patientsList={allPatients} />;
+    if (path === "/patients") return <PatientsPage navigate={navigate} patientsList={allPatients} role={role} />;
+    if (path === "/patients/new") return <NewPatientIntakePage navigate={navigate} onCreatePatient={addPatient} role={role} />;
     if (path === "/alerts") return <AlertsPage navigate={navigate} />;
     if (path === "/recommendations") return <RecommendationsPage navigate={navigate} />;
     if (path === "/reviews") return <ReviewsPage navigate={navigate} />;
@@ -1259,11 +1397,11 @@ export default function App() {
     if (path === "/settings") return <SettingsPage navigate={navigate} />;
     if (path === "/help") return <HelpPage navigate={navigate} />;
     const parts = path.split("/").filter(Boolean);
-    if (parts[0] === "patients" && parts[1] && parts[2] === "recommendation") return <RecommendationDetail id={parts[1]} navigate={navigate} />;
-    if (parts[0] === "patients" && parts[1] && parts[2] === "review") return <ReviewDetail id={parts[1]} navigate={navigate} />;
-    if (parts[0] === "patients" && parts[1]) return <PatientOverview id={parts[1]} navigate={navigate} patientsList={allPatients} />;
-    if (parts[0] === "recommendations" && parts[1]) return <RecommendationDetail id={parts[1]} navigate={navigate} />;
-    if (parts[0] === "reviews" && parts[1]) return <ReviewDetail id={parts[1]} navigate={navigate} />;
+    if (parts[0] === "patients" && parts[1] && parts[2] === "recommendation") return <RecommendationDetail id={parts[1]} navigate={navigate} role={role} />;
+    if (parts[0] === "patients" && parts[1] && parts[2] === "review") return <ReviewDetail id={parts[1]} navigate={navigate} role={role} />;
+    if (parts[0] === "patients" && parts[1]) return <PatientOverview id={parts[1]} navigate={navigate} patientsList={allPatients} role={role} />;
+    if (parts[0] === "recommendations" && parts[1]) return <RecommendationDetail id={parts[1]} navigate={navigate} role={role} />;
+    if (parts[0] === "reviews" && parts[1]) return <ReviewDetail id={parts[1]} navigate={navigate} role={role} />;
     return <NotFound navigate={navigate} />;
   }, [path, role, allPatients]);
 
