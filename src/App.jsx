@@ -786,6 +786,10 @@ function NewPatientIntakePage({ navigate, onCreatePatient, role = roles[0] }) {
   const [verified, setVerified] = useState({});
   const [documentCategory, setDocumentCategory] = useState("Previous prescription");
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  const [currentMedicineDraft, setCurrentMedicineDraft] = useState({ name: "", doseRoute: "", frequency: "", indication: "", startDate: "", source: "Patient reported" });
+  const [currentMedicineRows, setCurrentMedicineRows] = useState([]);
+  const [recentAntibioticDraft, setRecentAntibioticDraft] = useState({ name: "", duration: "", indication: "", source: "Patient reported", dates: "" });
+  const [recentAntibioticRows, setRecentAntibioticRows] = useState([]);
   const extractedFields = [
     ["Prior antibiotics", "Ceftriaxone started at transferring facility"],
     ["Culture status", "Blood culture pending"],
@@ -821,6 +825,24 @@ function NewPatientIntakePage({ navigate, onCreatePatient, role = roles[0] }) {
   const removeDocument = (id) => {
     setUploadedDocuments((current) => current.filter((doc) => doc.id !== id));
   };
+  const addCurrentMedicine = () => {
+    if (!currentMedicineDraft.name.trim()) {
+      setNotice("Enter the current medicine name before adding it.");
+      return;
+    }
+    setCurrentMedicineRows((current) => [...current, { id: `${currentMedicineDraft.name}-${Date.now()}`, ...currentMedicineDraft }]);
+    setCurrentMedicineDraft({ name: "", doseRoute: "", frequency: "", indication: "", startDate: "", source: "Patient reported" });
+    updateForm("currentMeds", "Yes");
+  };
+  const addRecentAntibiotic = () => {
+    if (!recentAntibioticDraft.name.trim()) {
+      setNotice("Enter the antibiotic name before adding it.");
+      return;
+    }
+    setRecentAntibioticRows((current) => [...current, { id: `${recentAntibioticDraft.name}-${Date.now()}`, ...recentAntibioticDraft }]);
+    setRecentAntibioticDraft({ name: "", duration: "", indication: "", source: "Patient reported", dates: "" });
+    updateForm("recentAntibiotics", "Yes");
+  };
   const submitPatient = () => {
     const id = pathway === "Existing EHR Patient" && mrn.trim() ? `P-${mrn.trim()}` : form.tempId;
     const patient = {
@@ -850,11 +872,13 @@ function NewPatientIntakePage({ navigate, onCreatePatient, role = roles[0] }) {
       uncertaintyCount,
       currentProblems: [form.chiefComplaint, "Incomplete antimicrobial history", "Epistemic uncertainty escalation"],
       cultures: [["Initial culture order", form.cultureOrdered === "Yes" ? "Ordered" : "Not confirmed", "-", "Intake", form.cultureOrdered === "Yes" ? "Pending" : "Missing"]],
-      medications: [[pathway === "Transferred Patient" ? "Prior facility therapy" : "Empiric therapy", "-", "-", "Pending verification", "Intake"]],
+      medications: currentMedicineRows.length ? currentMedicineRows.map((med) => [med.name, med.doseRoute || "-", med.frequency || "-", med.indication || "Patient-reported current medicine", med.startDate || "Intake"]) : [[pathway === "Transferred Patient" ? "Prior facility therapy" : "Empiric therapy", "-", "-", "Pending verification", "Intake"]],
+      recentAntibiotics: recentAntibioticRows.length ? recentAntibioticRows.map((item) => ({ ...item, status: "Unverified" })) : [{ id: "unknown-recent-antibiotics", name: form.recentAntibiotics === "No" ? "No antibiotic exposure reported" : "Unknown antibiotic exposure", duration: "-", indication: "-", source: "Manual intake", dates: "Past 90 days", status: form.recentAntibiotics === "No" ? "Patient reported" : "Unknown" }],
       labs: [["Vitals screen", "High priority", "Manual intake", "Now"]],
       uploadedDocuments: uploadedDocuments.map((doc) => ({ ...doc, status: doc.status === "Reviewed" ? "Reviewed" : "Unverified" })),
       timeline: [
         ["Now", pathway, "Patient entered through manual intake workflow."],
+        ["Now", "Medication history", `${currentMedicineRows.length} current medicine(s), ${recentAntibioticRows.length || (form.recentAntibiotics === "No" ? "no" : "unknown")} recent antibiotic exposure record(s).`],
         ["Now", "Previous documents", uploadedDocuments.length ? `${uploadedDocuments.length} patient-provided document(s) uploaded; verification required.` : "No previous prescription or report uploaded."],
         ["Now", "Uncertainty scorer", `${uncertaintyCount} critical history fields require confirmation.`],
         ["Now", "Escalation path", pathway === "Existing EHR Patient" ? "EHR timeline imported." : "Human review required before high-confidence recommendation."],
@@ -996,6 +1020,45 @@ function NewPatientIntakePage({ navigate, onCreatePatient, role = roles[0] }) {
               </FormControl>
             </div>
           </ClinicalPanel>
+          <ClinicalPanel title="Current Medicines Going On">
+            <p className="mb-4 text-sm leading-6 text-slate-600">Enter the actual medicines the patient is currently taking, including antibiotics, chronic medicines, or drugs started before arrival.</p>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <FormControl label="Medicine name"><Field placeholder="e.g., Meropenem" value={currentMedicineDraft.name} onChange={(value) => setCurrentMedicineDraft((current) => ({ ...current, name: value }))} /></FormControl>
+              <FormControl label="Dose / route"><Field placeholder="e.g., 1 g IV" value={currentMedicineDraft.doseRoute} onChange={(value) => setCurrentMedicineDraft((current) => ({ ...current, doseRoute: value }))} /></FormControl>
+              <FormControl label="Frequency"><Field placeholder="e.g., q8h" value={currentMedicineDraft.frequency} onChange={(value) => setCurrentMedicineDraft((current) => ({ ...current, frequency: value }))} /></FormControl>
+              <FormControl label="Indication"><Field placeholder="e.g., suspected sepsis" value={currentMedicineDraft.indication} onChange={(value) => setCurrentMedicineDraft((current) => ({ ...current, indication: value }))} /></FormControl>
+              <FormControl label="Start date"><Field placeholder="e.g., May 12" value={currentMedicineDraft.startDate} onChange={(value) => setCurrentMedicineDraft((current) => ({ ...current, startDate: value }))} /></FormControl>
+              <FormControl label="Source"><SelectBox value={currentMedicineDraft.source} onChange={(value) => setCurrentMedicineDraft((current) => ({ ...current, source: value }))} options={["Patient reported", "Previous prescription", "Transfer note", "EHR verified"]} /></FormControl>
+            </div>
+            <div className="mt-4 flex justify-end"><Button variant="outline" onClick={addCurrentMedicine}>Add current medicine</Button></div>
+            <div className="mt-4 grid gap-3">
+              {currentMedicineRows.length === 0 ? <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">No current medicine details added yet.</div> : currentMedicineRows.map((med) => (
+                <div key={med.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 md:flex-row md:items-center md:justify-between">
+                  <div><p className="font-bold">{med.name}</p><p className="mt-1 text-sm text-slate-600">{med.doseRoute || "-"} · {med.frequency || "-"} · {med.indication || "No indication entered"}</p><p className="mt-1 text-xs font-semibold text-slate-500">Source: {med.source} · Start: {med.startDate || "Not recorded"}</p></div>
+                  <Button variant="ghost" className="px-3" onClick={() => setCurrentMedicineRows((current) => current.filter((item) => item.id !== med.id))} aria-label={`Remove ${med.name}`}><X className="h-4 w-4" /></Button>
+                </div>
+              ))}
+            </div>
+          </ClinicalPanel>
+          <ClinicalPanel title="Antibiotic Exposure in Last 90 Days">
+            <p className="mb-4 text-sm leading-6 text-slate-600">If the patient used antibiotics recently, record which antibiotic, why it was used, and where the information came from.</p>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <FormControl label="Antibiotic name"><Field placeholder="e.g., Ceftriaxone" value={recentAntibioticDraft.name} onChange={(value) => setRecentAntibioticDraft((current) => ({ ...current, name: value }))} /></FormControl>
+              <FormControl label="Duration"><Field placeholder="e.g., 5 days" value={recentAntibioticDraft.duration} onChange={(value) => setRecentAntibioticDraft((current) => ({ ...current, duration: value }))} /></FormControl>
+              <FormControl label="Reason"><Field placeholder="e.g., UTI" value={recentAntibioticDraft.indication} onChange={(value) => setRecentAntibioticDraft((current) => ({ ...current, indication: value }))} /></FormControl>
+              <FormControl label="Dates"><Field placeholder="e.g., last month" value={recentAntibioticDraft.dates} onChange={(value) => setRecentAntibioticDraft((current) => ({ ...current, dates: value }))} /></FormControl>
+              <FormControl label="Source"><SelectBox value={recentAntibioticDraft.source} onChange={(value) => setRecentAntibioticDraft((current) => ({ ...current, source: value }))} options={["Patient reported", "Previous prescription", "Transfer note", "EHR verified"]} /></FormControl>
+            </div>
+            <div className="mt-4 flex justify-end"><Button variant="outline" onClick={addRecentAntibiotic}>Add past antibiotic</Button></div>
+            <div className="mt-4 grid gap-3">
+              {recentAntibioticRows.length === 0 ? <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">No past antibiotic details added yet.</div> : recentAntibioticRows.map((item) => (
+                <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50/30 p-4 md:flex-row md:items-center md:justify-between">
+                  <div><p className="font-bold">{item.name}</p><p className="mt-1 text-sm text-slate-600">{item.duration || "-"} · {item.indication || "No reason entered"} · {item.dates || "Dates not recorded"}</p><p className="mt-1 text-xs font-semibold text-amber-700">Source: {item.source} · Requires verification</p></div>
+                  <Button variant="ghost" className="px-3" onClick={() => setRecentAntibioticRows((current) => current.filter((med) => med.id !== item.id))} aria-label={`Remove ${item.name}`}><X className="h-4 w-4" /></Button>
+                </div>
+              ))}
+            </div>
+          </ClinicalPanel>
           <ClinicalPanel title="Previous Documents">
             <p className="mb-4 text-sm leading-6 text-slate-600">Upload photos or PDFs of previous prescriptions, lab reports, or discharge documents. These remain unverified until reviewed by the doctor.</p>
             <div className="grid gap-3 md:grid-cols-[240px_1fr]">
@@ -1126,6 +1189,7 @@ function PatientOverview({ id, navigate, patientsList = patients, role = roles[0
           <DataPanel title="Key Labs" rows={patient.labs} headers={["Test", "Result", "Ref. range", "Date"]} />
           <UploadedReportsPanel documents={patient.uploadedDocuments} />
           <DataPanel title="Current Medications" rows={patient.medications} headers={["Medication", "Dose / Route", "Frequency", "Indication", "Start date"]} />
+          <RecentAntibioticsPanel antibiotics={patient.recentAntibiotics} />
           <ClinicalPanel title="Clinical Timeline">
             <div className="space-y-4">
               {patient.timeline.map(([time, title, note]) => <div key={`${time}-${title}`} className="flex gap-3"><div className="mt-1 h-3 w-3 rounded-full bg-teal-500" /><div><p className="font-bold">{time} · {title}</p><p className="text-sm text-slate-600">{note}</p></div></div>)}
@@ -1142,6 +1206,7 @@ function PatientOverview({ id, navigate, patientsList = patients, role = roles[0
           <ClinicalPanel title="Quick Info">
             <Info label="Code status" value="Full code" /><Info label="Isolation" value="Contact precautions" /><Info label="Lines / Drains" value="ETT, CVC, Foley" /><Info label="Weight" value="78 kg" />
           </ClinicalPanel>
+          <PatientAssistant patient={patient} />
         </div>
       </div>
     </>
@@ -1182,6 +1247,71 @@ function UploadedReportsPanel({ documents = [] }) {
       )}
     </ClinicalPanel>
   );
+}
+
+function RecentAntibioticsPanel({ antibiotics = [] }) {
+  return (
+    <ClinicalPanel title="Recent Antibiotic Exposure (Past 90 Days)">
+      {antibiotics.length === 0 ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">No recent antibiotic exposure documented.</div>
+      ) : (
+        <div className="space-y-3">
+          {antibiotics.map((item) => (
+            <div key={item.id || item.name} className="rounded-lg border border-slate-200 p-4">
+              <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{item.name}</p><Badge tone={item.status === "Unknown" ? "review" : item.status === "Unverified" ? "review" : "safe"}>{item.status || "Recorded"}</Badge></div>
+              <p className="mt-1 text-sm text-slate-600">{item.duration || "-"} · {item.indication || "No indication"} · {item.dates || "Dates not recorded"}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">Source: {item.source || "Manual intake"}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </ClinicalPanel>
+  );
+}
+
+function PatientAssistant({ patient }) {
+  const starter = "Ask about this patient’s labs, cultures, medicines, recent antibiotics, uploaded reports, or missing data.";
+  const [messages, setMessages] = useState([{ sender: "AI", text: starter }]);
+  const [question, setQuestion] = useState("");
+  const ask = (prompt) => {
+    const text = (prompt || question).trim();
+    if (!text) return;
+    setMessages((current) => [...current, { sender: "You", text }, { sender: "AI", text: patientAssistantAnswer(patient, text) }]);
+    setQuestion("");
+  };
+  const chips = ["Summarize this patient", "Current meds?", "Recent antibiotics?", "Latest labs?", "Uploaded reports?", "What data is missing?"];
+  return (
+    <ClinicalPanel title="Patient AI Assistant">
+      <p className="mb-3 text-xs font-semibold leading-5 text-slate-500">Uses this patient profile only. It does not create treatment orders.</p>
+      <div className="max-h-72 space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
+        {messages.map((message, index) => (
+          <div key={`${message.sender}-${index}`} className={cx("rounded-lg p-3 text-sm leading-6", message.sender === "AI" ? "bg-white text-slate-700" : "bg-blue-600 text-white")}>
+            <p className="mb-1 text-xs font-bold">{message.sender}</p>
+            <p>{message.text}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">{chips.map((chip) => <Button key={chip} variant="soft" className="min-h-8 px-3 py-1 text-xs" onClick={() => ask(chip)}>{chip}</Button>)}</div>
+      <div className="mt-3 flex gap-2"><Field placeholder="Ask about this patient..." value={question} onChange={setQuestion} className="flex-1" /><Button onClick={() => ask()}>Ask</Button></div>
+    </ClinicalPanel>
+  );
+}
+
+function patientAssistantAnswer(patient, prompt) {
+  const query = prompt.toLowerCase();
+  const currentMeds = patient.medications?.map((row) => `${row[0]} ${row[1] || ""} ${row[2] || ""}`.trim()).join("; ") || "No current medicines documented";
+  const recentAntibiotics = patient.recentAntibiotics?.map((item) => `${item.name} (${item.status || item.source || "recorded"})`).join("; ") || "No recent antibiotic exposure documented";
+  const labs = patient.labs?.map((row) => `${row[0]} ${row[1]} on ${row[3]}`).join("; ") || "No labs documented";
+  const cultures = patient.cultures?.map((row) => `${row[0]}: ${row[1]} ${row[2] || ""} (${row[4]})`).join("; ") || "No cultures documented";
+  const docs = patient.uploadedDocuments?.length ? patient.uploadedDocuments.map((doc) => `${doc.name} (${doc.category}, ${doc.status})`).join("; ") : "No previous documents uploaded";
+  let answer = `${patient.name} (${patient.id}) has ${patient.diagnosis}. Current therapy: ${patient.therapy}. Allergies: ${patient.allergies}.`;
+  if (query.includes("med")) answer = `Current medicines documented: ${currentMeds}.`;
+  if (query.includes("antibiotic") || query.includes("90")) answer = `Recent antibiotic exposure: ${recentAntibiotics}. Unverified or unknown entries should be confirmed before clinical use.`;
+  if (query.includes("lab")) answer = `Latest labs in this profile: ${labs}.`;
+  if (query.includes("culture")) answer = `Culture information: ${cultures}.`;
+  if (query.includes("upload") || query.includes("report") || query.includes("document")) answer = `Uploaded patient-provided documents: ${docs}. These are not verified clinical facts unless marked reviewed.`;
+  if (query.includes("missing") || query.includes("unknown")) answer = `Missing or uncertain data: ${patient.allergies?.includes("Unknown") ? "allergy history; " : ""}${recentAntibiotics.includes("Unknown") ? "recent antibiotic exposure; " : ""}${docs.includes("No previous") ? "previous documents; " : ""}culture status should be confirmed if pending.`;
+  return `${answer} Based on: this patient profile, meds, labs, cultures, uploaded reports, and timeline. Clinical decision requires treating doctor/consultant review.`;
 }
 
 function List({ items }) {
